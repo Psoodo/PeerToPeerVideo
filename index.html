@@ -8,13 +8,21 @@
 				width: 320px;
 			}
 		</style>
-
 	</head>
-
 	<body>
-
-		<video id="localVideo" autoplay playsinline></video>
-		<video id="remoteVideo" autoplay playsinline></video>
+		<div>
+			<p>
+			    <!-- MJAMES - 12-29-2021 - Mute the local video to prevent feedback -->
+				<video id="localVideo" autoplay playsinline muted="muted"></video>
+			    <!-- MJAMES - 12-29-2021 - Add the local screen -->
+				<video id="localScreen" autoplay playsinline></video>
+			</p>
+			<p>
+				<video id="remoteVideo" autoplay playsinline></video>
+			    <!-- MJAMES - 12-29-2021 - Add the remote screen -->
+				<video id="remoteScreen" autoplay playsinline></video>
+			</p>
+		</div>
 
 		<div>
 			<p>
@@ -24,7 +32,7 @@
 				<input type="text" id="remoteAnswer" placeholder="remote answer"/><button id="acceptAnswer">accept</button>
 			</p>
 			<p>
-				if you are the remote, paste the hosts offer and accept it:
+				If you are the remote, paste the hosts offer and accept it:
 				<input type="text" id="remoteOffer" placeholder="remote offer"//><button id="acceptOffer">accept</button><br/>
 				Then copy your answer and send it to the host:
 				<input type="text" id="localAnswer" placeholder="local answer"/>
@@ -34,12 +42,16 @@
 		<script type="text/javascript">
 			'use strict';
 
-			const mediaStreamConstraints = {video: true};
-			const offerOptions = {offerToReceiveVideo:1};
+			// MJAMES - 12-29-2021 - Enable audio as well
+			const mediaStreamConstraints = {audio: true, video: true};
+			const offerOptions = {offerToReceiveAudio:1, offerToReceiveVideo:1};
 			const servers = {'iceServers': [{'url': 'stun:stun.l.google.com:19302'}]};
 
+			// MJAMES - 12-29-2021 - Local and remote screens
 			const localVideo = document.getElementById('localVideo');
+			const localScreen = document.getElementById('localScreen');
 			const remoteVideo = document.getElementById('remoteVideo');
+			const remoteScreen = document.getElementById('remoteScreen');
 
 			const localOffer = document.getElementById('localOffer');
 			const remoteOffer = document.getElementById('remoteOffer');
@@ -54,7 +66,6 @@
 			createOffer.addEventListener('click', offerCreate);
 			acceptOffer.addEventListener('click', offerAccept);
 			acceptAnswer.addEventListener('click', answerAccept);
-
 
 			// Create peer connections and add behavior.
 			const peerConnection = new RTCPeerConnection(servers);
@@ -72,8 +83,22 @@
 				
 					localVideo.srcObject = mediaStream;
 
-					for (const track of mediaStream.getTracks())
+					for (const track of mediaStream.getTracks()) {
 						peerMediaStream.addTrack(track);
+						}
+					}
+				)
+				.catch(logError);
+	
+			// get the local screen stream
+			navigator.mediaDevices.getDisplayMedia()
+				.then((mediaStream) => {
+				
+					localScreen.srcObject = mediaStream;
+
+					for (const track of mediaStream.getTracks()) {
+							peerMediaStream.addTrack(track);
+						}
 					}
 				)
 				.catch(logError);
@@ -103,7 +128,28 @@
 			function gotRemoteMediaStream(event) {
 
 				const mediaStream = event.stream;
-				remoteVideo.srcObject = mediaStream;
+				
+				var remoteVideoMediaStream = new MediaStream();
+				var remoteScreenMediaStream = new MediaStream();
+				
+				try
+				{
+					// MJAMES - 12-29-2021 - For the sake of this test I will assume
+					// that all three tracks are present. This will fail if one or
+					// more tracks are not present, and would not be production
+					// quality coding.
+					remoteVideoMediaStream.addTrack(mediaStream.getTracks()[0]);
+					remoteVideoMediaStream.addTrack(mediaStream.getTracks()[1]);
+					remoteScreenMediaStream.addTrack(mediaStream.getTracks()[2]);
+				}
+				catch(error)
+				{
+					logError(error);
+				}
+
+				remoteVideo.srcObject = remoteVideoMediaStream;
+				remoteScreen.srcObject = remoteScreenMediaStream;
+
 				console.log('remote peer connection received remote stream')
 			}
 
@@ -121,7 +167,6 @@
 					.catch(logError);
 			}
 
-
 			function offerAccept() {
 
 				const description = JSON.parse(remoteOffer.value);
@@ -133,7 +178,6 @@
 				peerConnection.createAnswer()
 					.then(createdAnswer)
 					.catch(logError);
-				
 			}
 
 			function createdAnswer(description) {
@@ -150,17 +194,12 @@
 				peerConnection.setRemoteDescription(description)
 					.then(() => {console.log('Local peer remote description set');})
 					.catch(logError);
-				
 			}
-					
 					
 			function logError(error) {
 
 				console.log(error.toString());
 			}
-		
-		
 		</script>
-
 	</body>
 </html>
